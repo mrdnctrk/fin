@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>IBKR Margin Call Calculator</title>
+<style>
+    body {
+        margin: 0;
+        background: #121212;
+        color: #e0e0e0;
+        font-family: Arial, sans-serif;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .container {
+        background: #1e1e1e;
+        padding: 40px;
+        border-radius: 14px;
+        width: 420px;
+        box-shadow: 0 0 25px rgba(0,0,0,0.55);
+        text-align: center;
+    }
+
+    h2 {
+        margin-top: 0;
+        margin-bottom: 28px;
+        font-weight: 300;
+        color: #ffffff;
+        font-size: 28px;
+    }
+
+    label {
+        font-size: 18px;
+        display: block;
+        text-align: left;
+        margin-top: 18px;
+        margin-bottom: 5px;
+    }
+
+    input {
+        width: 100%;
+        padding: 14px;
+        font-size: 18px;
+        border-radius: 8px;
+        border: 1px solid #333;
+        background: #2b2b2b;
+        color: #e0e0e0;
+    }
+
+    button {
+        width: 100%;
+        padding: 16px;
+        margin-top: 25px;
+        border: none;
+        border-radius: 8px;
+        background: #2979ff;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    button:hover {
+        background: #5393ff;
+    }
+
+    .result {
+        margin-top: 30px;
+        padding: 20px;
+        background: #252525;
+        border-radius: 10px;
+        font-size: 18px;
+        line-height: 1.6;
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>IBKR Margin Call Calculator</h2>
+
+    <label>Total Market Value (includes your equity + loan)</label>
+    <input type="number" id="mv" value="15000">
+
+    <label>Loan Value</label>
+    <input type="number" id="loan" value="5000">
+
+    <label>Margin Rate (%)</label>
+    <input type="number" id="rate" value="30">
+
+    <button onclick="calc()">Calculate</button>
+
+    <div class="result" id="result"></div>
+</div>
+
+<script>
+function calc() {
+    // read inputs
+    const mv = Number(document.getElementById('mv').value) || 0;
+    const loan = Number(document.getElementById('loan').value) || 0;
+    const rateInput = Number(document.getElementById('rate').value);
+    const rate = (isFinite(rateInput) ? rateInput / 100 : 0);
+
+    if (!isFinite(mv) || !isFinite(loan) || !isFinite(rate)) {
+        document.getElementById('result').innerHTML = 'Please enter valid numeric values.';
+        return;
+    }
+
+    if (rate <= 0 || rate >= 1) {
+        document.getElementById('result').innerHTML = 'Margin rate must be between 1% and 99%.';
+        return;
+    }
+
+    // calculations
+    const mmr = mv * rate;           // maintenance margin requirement (current MV)
+    const equity = mv - loan;       // current equity
+    const mv_call = loan / (1 - rate); // market value that triggers a margin call
+    const drop_pct = mv === 0 ? 0 : ((mv - mv_call) / mv) * 100;
+
+    // build output: primary results first, then MMR & Equity, then explanation at the bottom
+    let html = '';
+
+    html += `<b>Market Value at Margin Call:</b> $${mv_call.toFixed(2)}<br>`;
+    html += `<span style='font-size:16px; color:#bbb;'>This is the market value level where your equity will equal the maintenance requirement (i.e., the actual margin-call trigger).</span><br><br>`;
+
+    html += `<b>Percentage Drop Before Margin Call (from current MV):</b> ${drop_pct.toFixed(2)}%<br><br>`;
+
+    html += `<b>Maintenance Margin Requirement (MMR):</b> $${mmr.toFixed(2)}<br>`;
+    html += `<span style='font-size:16px; color:#bbb;'>Minimum equity required at the <i>current</i> market value (updates as MV changes).</span><br><br>`;
+
+    html += `<b>Your Current Equity:</b> $${equity.toFixed(2)}<br>`;
+    html += `<span style='font-size:16px; color:#bbb;'>Equity = Market Value − Loan.</span><br><br>`;
+
+    html += `<hr style='border-color:#333;'>`;
+
+    html += `<b style='font-size:18px;'>Explanation — why MMR can be confusing</b><br>
+    <div style='text-align:left; margin-top:8px;'>
+        MMR (Maintenance Margin Requirement) is calculated as a percentage of the <u>current</u> market value. As market value falls, the MMR also falls. Because your loan is fixed, your equity (MV − loan) will shrink faster than MV itself.<br><br>
+        This is why comparing your current equity to today's MMR is misleading — the MMR at the time of the margin call will be lower than it is now. The true margin-call trigger is the market value where equity equals the MMR calculated on that future (lower) market value. Use the <b>Market Value at Margin Call</b> shown above to understand actual risk.
+    </div>`;
+
+    document.getElementById('result').innerHTML = html;
+}
+</script>
+
+</body>
+</html>

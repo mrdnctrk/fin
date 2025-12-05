@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Loss Harvesting Break-Even Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #f4f4f9;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="number"], input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        .note {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #ecf0f1;
+            border-radius: 5px;
+            border-left: 5px solid #2ecc71;
+        }
+        .result-item {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .result-item strong {
+            color: #2c3e50;
+        }
+        #optimalPrice {
+            font-size: 1.6em;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        #percentIncrease {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>🇨🇦 Tax Loss Harvesting Calculator</h2>
+
+    <div class="input-group">
+        <label for="shares">Number of Shares</label>
+        <input type="number" id="shares" value="26" step="1" oninput="calculatePrice()">
+    </div>
+
+    <div class="input-group">
+        <label for="acb">Average Cost Base (ACB) per Share ($)</label>
+        <input type="number" id="acb" value="285.72" step="0.01" oninput="calculatePrice()">
+    </div>
+
+    <div class="input-group">
+        <label for="sellPrice">Current Selling Price per Share ($)</label>
+        <input type="number" id="sellPrice" value="218.10" step="0.01" oninput="calculatePrice()">
+        <div class="note">The price you sold at for the loss.</div>
+    </div>
+
+    <div class="input-group">
+        <label for="marginalRate">Your Marginal Tax Rate (%)</label>
+        <input type="number" id="marginalRate" value="48.28" min="0" max="100" step="0.01" oninput="calculatePrice()">
+        <div class="note">Defaulted to 48.28%. Use your actual combined federal/provincial rate.</div>
+    </div>
+
+    <div class="result-section">
+        <h3>Calculated Results (T-Loss P_Optimal)</h3>
+        
+        <div class="result-item">
+            Loss per Share: <span id="lossPerShareDisplay"></span>
+        </div>
+        <div class="result-item">
+            Total Capital Loss (USD/CAD): <span id="totalLossDisplay"></span>
+        </div>
+        <div class="result-item">
+            Estimated Tax Savings (CAD): <span id="taxSavingsDisplay"></span>
+        </div>
+        <div class="result-item">
+            Price Buffer from Tax Savings: <span id="priceBufferDisplay"></span>
+            <div class="note">This is the maximum per-share price increase your tax savings can cover.</div>
+        </div>
+        <hr>
+        
+        <div class="result-item">
+            **Optimal (Break-Even) Buy-Back Price:**
+            <div id="optimalPrice">---</div>
+        </div>
+        
+        <div class="result-item">
+            **Required Price Increase (from Sell Price):**
+            <div id="percentIncrease">---</div>
+            <div class="note">
+                The percentage the stock price needs to rise above the sell price to wipe out the tax benefit.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set the capital gains inclusion rate for Canada (50%)
+        const INCLUSION_RATE = 0.5; 
+
+        function calculatePrice() {
+            // 1. Get User Inputs
+            // Use logical defaults if fields are empty to prevent NaN errors
+            const shares = parseFloat(document.getElementById('shares').value) || 0;
+            const acb = parseFloat(document.getElementById('acb').value) || 0;
+            const sellPrice = parseFloat(document.getElementById('sellPrice').value) || 0;
+            const marginalRate = (parseFloat(document.getElementById('marginalRate').value) || 0) / 100;
+
+            // Check for valid numbers and ensure a loss exists
+            if (shares <= 0 || acb <= 0 || sellPrice <= 0 || sellPrice >= acb) {
+                const invalidMessage = (sellPrice >= acb && shares > 0) ? 'No loss to harvest!' : 'Please enter valid values.';
+                document.getElementById('optimalPrice').textContent = invalidMessage;
+                // Clear all dynamic displays
+                document.getElementById('percentIncrease').textContent = '---';
+                document.getElementById('lossPerShareDisplay').textContent = '---';
+                document.getElementById('totalLossDisplay').textContent = '---';
+                document.getElementById('taxSavingsDisplay').textContent = '---';
+                document.getElementById('priceBufferDisplay').textContent = '---';
+                return;
+            }
+
+            // 2. Calculate Loss
+            const lossPerShare = acb - sellPrice;
+            const totalCapitalLoss = lossPerShare * shares;
+            const allowableCapitalLoss = totalCapitalLoss * INCLUSION_RATE;
+
+            // 3. Calculate Tax Savings (The 'Gain' from the Tax Loss)
+            const taxSavings = allowableCapitalLoss * marginalRate;
+
+            // 4. Calculate Price Buffer (The maximum price rise the savings can cover)
+            const priceBuffer = taxSavings / shares;
+
+            // 5. Calculate Optimal Buy-Back Price (P_Optimal)
+            const optimalPrice = sellPrice + priceBuffer;
+            
+            // 6. Calculate Percentage Increase Required
+            const percentIncrease = (priceBuffer / sellPrice) * 100;
+
+            // 7. Display Results
+            document.getElementById('lossPerShareDisplay').textContent = `$${lossPerShare.toFixed(2)}`;
+            document.getElementById('totalLossDisplay').textContent = `$${totalCapitalLoss.toFixed(2)}`;
+            document.getElementById('taxSavingsDisplay').textContent = `$${taxSavings.toFixed(2)}`;
+            document.getElementById('priceBufferDisplay').textContent = `$${priceBuffer.toFixed(2)}`;
+            document.getElementById('optimalPrice').textContent = `$${optimalPrice.toFixed(2)}`;
+            document.getElementById('percentIncrease').textContent = `${percentIncrease.toFixed(2)}%`;
+        }
+
+        // Run the calculation once on load with default values
+        calculatePrice();
+    </script>
+
+</body>
+</html>
